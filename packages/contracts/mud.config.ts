@@ -2,9 +2,9 @@ import { defineWorld } from "@latticexyz/world";
 
 export default defineWorld({
   tables: {
-    Counter: {
+    EntryPoint: {
       schema: {
-        value: "uint32",
+        addr: "address",
       },
       key: [],
     },

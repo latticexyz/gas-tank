@@ -5,6 +5,7 @@ import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
 import { StoreSwitch } from "@latticexyz/store/src/StoreSwitch.sol";
 
+import { EntryPoint } from "../src/codegen/index.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 
 contract PostDeploy is Script {
@@ -18,12 +19,7 @@ contract PostDeploy is Script {
     // Start broadcasting transactions from the deployer account
     vm.startBroadcast(deployerPrivateKey);
 
-    // ------------------ EXAMPLES ------------------
-
-    // Call increment on the world via the registered function selector
-    uint32 newValue = IWorld(worldAddress).increment();
-    console.log("Increment via IWorld:", newValue);
-
+    EntryPoint.set(0x0000000071727De22E5E9d8BAf0edAc6f37da032);
     vm.stopBroadcast();
   }
 }

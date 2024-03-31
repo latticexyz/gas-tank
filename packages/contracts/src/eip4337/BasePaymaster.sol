@@ -27,7 +27,7 @@ abstract contract BasePaymaster is IPaymaster {
 
     /// @inheritdoc IPaymaster
     function validatePaymasterUserOp(
-        UserOperation calldata userOp,
+        PackedUserOperation calldata userOp,
         bytes32 userOpHash,
         uint256 maxCost
     ) external override returns (bytes memory context, uint256 validationData) {
@@ -42,7 +42,7 @@ abstract contract BasePaymaster is IPaymaster {
      * @param maxCost    - The maximum cost of the user operation.
      */
     function _validatePaymasterUserOp(
-        UserOperation calldata userOp,
+        PackedUserOperation calldata userOp,
         bytes32 userOpHash,
         uint256 maxCost
     ) internal virtual returns (bytes memory context, uint256 validationData);
