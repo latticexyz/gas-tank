@@ -34,6 +34,4 @@ interface IPaymasterSystem {
   function registerSpender(address spender) external;
 
   function unregisterSpender(address spender) external;
-
-  function deposit() external payable;
 }

@@ -109,16 +109,6 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
         require(_msgSender() == EntryPoint.get(), "Sender not EntryPoint");
     }
 
-    ///////////////////////////////////////
-    // STUFF BELOW HERE JUST FOR DEV
-
-    /**
-     * Add a deposit for this paymaster, used for paying for transaction fees.
-     */
-    function deposit() public payable {
-      _depositToEntryPoint(_msgValue());
-    }
-
     function _depositToEntryPoint(uint256 amount) internal {
         WorldBalances.set(ROOT_NAMESPACE_ID, WorldBalances.get(ROOT_NAMESPACE_ID) - amount);
         IEntryPoint(EntryPoint.get()).depositTo{value: amount}(address(this)); 

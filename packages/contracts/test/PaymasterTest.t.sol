@@ -67,7 +67,7 @@ contract PaymasterTest is MudTest {
 
   // sanity check for everything works without paymaster
   function testCall() external {
-    vm.deal(address(account), 1e18);
+    vm.deal(address(account), 1 ether);
     PackedUserOperation memory op = fillUserOp(
       account,
       userKey,
@@ -84,7 +84,12 @@ contract PaymasterTest is MudTest {
   }
 
   function testPaymaster() external {
-    vm.deal(address(account), 1e18);
+    vm.deal(address(this), 1 ether);
+    paymaster.depositTo{value: 1 ether}(user);
+
+    vm.prank(user);
+    paymaster.registerSpender(address(account));
+
     PackedUserOperation memory op = fillUserOp(
       account,
       userKey,
