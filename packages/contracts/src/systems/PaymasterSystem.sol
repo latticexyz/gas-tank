@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
+import { IPaymaster } from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
+import { PackedUserOperation } from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
+import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import { _packValidationData } from "@account-abstraction/contracts/core/Helpers.sol";
+
 import { System } from "@latticexyz/world/src/System.sol";
 import { Balances } from "@latticexyz/world/src/codegen/index.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
-import { IPaymaster, PostOpMode } from "../eip4337/IPaymaster.sol";
-import { PackedUserOperation } from "../eip4337/PackedUserOperation.sol";
-import { IEntryPoint } from "../eip4337/IEntryPoint.sol";
-import { _packValidationData } from "../eip4337/Helpers.sol";
 import { EntryPoint } from "../codegen/index.sol";
 
 contract PaymasterSystem is System, IPaymaster {
@@ -33,18 +34,22 @@ contract PaymasterSystem is System, IPaymaster {
         uint256 maxCost
     ) internal virtual returns (bytes memory context, uint256 validationData) {
       (userOp, userOpHash, maxCost, context, validationData);
-      // TODO
+      // Require the sender to be a valid spender of a user account
+      // Require the user account balance associated with the app smart account to have sufficient balance
+      // Deduct gasPrice * (verificationGasLimit + callGasLimit + paymasterVerificationGasLimit + postOpGasLimit) from the user account balance
+      // Pass the deducted balance in context
       return ("", _packValidationData(false, 0, 0));
     }
 
     /// @inheritdoc IPaymaster
     function postOp(
-        PostOpMode mode,
+        IPaymaster.PostOpMode mode,
         bytes calldata context,
-        uint256 actualGasCost
+        uint256 actualGasCost,
+        uint256 actualUserOpFeePerGas
     ) external override {
         _requireFromEntryPoint();
-        _postOp(mode, context, actualGasCost);
+        _postOp(mode, context, actualGasCost, actualUserOpFeePerGas);
     }
 
     /**
@@ -61,12 +66,27 @@ contract PaymasterSystem is System, IPaymaster {
      * @param actualGasCost - Actual gas used so far (without this postOp call).
      */
     function _postOp(
-        PostOpMode mode,
+        IPaymaster.PostOpMode mode,
         bytes calldata context,
-        uint256 actualGasCost
+        uint256 actualGasCost,
+        uint256 actualUserOpFeePerGas
     ) internal virtual {
-        (mode, context, actualGasCost); // unused params
+        (mode, context, actualGasCost, actualUserOpFeePerGas); // unused params
         revert("not implemented");
+        // Refund decutedBalance - (actualGasCost * actualUserOpFeePerGas + overhead for postOp) to the user account balance
+    }
+
+    function depositTo(address account) public payable {
+      // Increase balance for this account
+      // Deposit the value in the entry point
+    }
+
+    function registerSpender(address spender) public {
+      // Add a new spender to the spender table
+    }
+
+    function unregisterSpender(address spender) public {
+      // Remove a spender from the spender table
     }
 
     /**
@@ -83,7 +103,11 @@ contract PaymasterSystem is System, IPaymaster {
      * Add a deposit for this paymaster, used for paying for transaction fees.
      */
     function deposit() public payable {
-        Balances.set(ROOT_NAMESPACE_ID, Balances.get(ROOT_NAMESPACE_ID) - _msgValue());
-        IEntryPoint(EntryPoint.get()).depositTo{value: _msgValue()}(address(this));
+      _depositToEntryPoint(_msgValue());
+    }
+
+    function _depositToEntryPoint(uint256 amount) internal {
+        Balances.set(ROOT_NAMESPACE_ID, Balances.get(ROOT_NAMESPACE_ID) - amount);
+        IEntryPoint(EntryPoint.get()).depositTo{value: amount}(address(this)); 
     }
 }
