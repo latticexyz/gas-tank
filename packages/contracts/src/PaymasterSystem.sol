@@ -7,11 +7,14 @@ import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoi
 import { _packValidationData } from "@account-abstraction/contracts/core/Helpers.sol";
 
 import { System } from "@latticexyz/world/src/System.sol";
-import { Balances } from "@latticexyz/world/src/codegen/index.sol";
+import { Balances as WorldBalances } from "@latticexyz/world/src/codegen/index.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
-import { EntryPoint } from "../codegen/index.sol";
+import { EntryPoint } from "./codegen/tables/EntryPoint.sol";
+import { UserBalances } from "./codegen/tables/UserBalances.sol";
+import { Spender } from "./codegen/tables/Spender.sol";
+import { IAllowance } from "./IAllowance.sol";
 
-contract PaymasterSystem is System, IPaymaster {
+contract PaymasterSystem is System, IPaymaster, IAllowance {
     /// @inheritdoc IPaymaster
     function validatePaymasterUserOp(
         PackedUserOperation calldata userOp,
@@ -76,17 +79,27 @@ contract PaymasterSystem is System, IPaymaster {
         // Refund decutedBalance - (actualGasCost * actualUserOpFeePerGas + overhead for postOp) to the user account balance
     }
 
+    function getAllowance(address spender) public view returns (uint256) {
+      return UserBalances.get(Spender.getUserAccount(spender));
+    }
+
+    function getBalance(address user) public view returns (uint256) {
+      return UserBalances.get(user);
+    }
+
     function depositTo(address account) public payable {
-      // Increase balance for this account
-      // Deposit the value in the entry point
+      UserBalances.set(account, UserBalances.get(account) + _msgValue());
+      _depositToEntryPoint(_msgValue()); 
     }
 
     function registerSpender(address spender) public {
-      // Add a new spender to the spender table
+      require(Spender.getUserAccount(spender) == address(0), "Spender already registered");
+      Spender.setUserAccount(spender, _msgSender());
     }
 
     function unregisterSpender(address spender) public {
-      // Remove a spender from the spender table
+      require(Spender.getUserAccount(spender) == _msgSender(), "Spender registered for another user");
+      Spender.deleteRecord(spender);
     }
 
     /**
@@ -107,7 +120,7 @@ contract PaymasterSystem is System, IPaymaster {
     }
 
     function _depositToEntryPoint(uint256 amount) internal {
-        Balances.set(ROOT_NAMESPACE_ID, Balances.get(ROOT_NAMESPACE_ID) - amount);
+        WorldBalances.set(ROOT_NAMESPACE_ID, WorldBalances.get(ROOT_NAMESPACE_ID) - amount);
         IEntryPoint(EntryPoint.get()).depositTo{value: amount}(address(this)); 
     }
 }

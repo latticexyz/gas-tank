@@ -53,12 +53,16 @@ contract PaymasterTest is MudTest {
 
     vm.prank(NamespaceOwner.get(ROOT_NAMESPACE_ID));
     EntryPointTable.set(address(entryPoint));
+  }
 
-    // FOR TESTING, REMOVE LATER
-    vm.deal(paymasterOperator, 1000e18);
-    vm.startPrank(paymasterOperator);
-    entryPoint.depositTo{ value: 100e18 }(address(paymaster));
-    vm.stopPrank();
+  function testDepositTo() external {
+    vm.deal(address(this), 1 ether);
+    paymaster.depositTo{ value: 1 ether }(user);
+    assertEq(paymaster.getBalance(user), 1 ether);
+
+    vm.prank(user);
+    paymaster.registerSpender(address(account));
+    assertEq(paymaster.getAllowance(address(account)), 1 ether);
   }
 
   // sanity check for everything works without paymaster

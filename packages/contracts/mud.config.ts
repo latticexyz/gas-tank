@@ -8,5 +8,19 @@ export default defineWorld({
       },
       key: [],
     },
+    UserBalances: {
+      schema: {
+        userAccount: "address",
+        balance: "uint256",
+      },
+      key: ["userAccount"],
+    },
+    Spender: {
+      schema: {
+        spender: "address",
+        userAccount: "address",
+      },
+      key: ["spender"],
+    },
   },
 });

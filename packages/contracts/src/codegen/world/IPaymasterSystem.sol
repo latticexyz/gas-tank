@@ -25,6 +25,10 @@ interface IPaymasterSystem {
     uint256 actualUserOpFeePerGas
   ) external;
 
+  function getAllowance(address spender) external view returns (uint256);
+
+  function getBalance(address user) external view returns (uint256);
+
   function depositTo(address account) external payable;
 
   function registerSpender(address spender) external;
