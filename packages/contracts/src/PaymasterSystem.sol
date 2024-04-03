@@ -60,7 +60,8 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     UserBalances.set(userAccount, balance - cost);
 
     // Pass the deducted balance in the context
-    return (abi.encode(uint256(1)), _packValidationData(false, 0, 0));
+    context = abi.encode(uint256(1));
+    validationData = _packValidationData(false, 0, 0);
   }
 
   /// @inheritdoc IPaymaster
