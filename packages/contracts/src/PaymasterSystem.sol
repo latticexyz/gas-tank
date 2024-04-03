@@ -15,7 +15,7 @@ import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
 import { IAllowance } from "./IAllowance.sol";
 
-uint256 constant POST_OP_OVERHEAD = 30420;
+uint256 constant POST_OP_OVERHEAD = 30900;
 
 contract PaymasterSystem is System, IPaymaster, IAllowance {
   using UserOperationLib for PackedUserOperation;
