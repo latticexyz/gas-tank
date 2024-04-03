@@ -15,6 +15,8 @@ import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
 import { IAllowance } from "./IAllowance.sol";
 
+uint256 constant POST_OP_OVERHEAD = 0;
+
 contract PaymasterSystem is System, IPaymaster, IAllowance {
   using UserOperationLib for PackedUserOperation;
 
@@ -39,6 +41,8 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     bytes32 userOpHash,
     uint256 maxCost
   ) internal virtual returns (bytes memory context, uint256 validationData) {
+    (userOpHash); // unused parameter
+
     // Require the sender to be a registered spender of a user account
     address userAccount = Spender.getUserAccount(userOp.getSender());
     if (userAccount == address(0)) {
@@ -46,21 +50,16 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     }
 
     // Require the user account to have sufficient balance
-    uint256 cost = userOp.gasPrice() *
-      (userOp.unpackVerificationGasLimit() +
-        userOp.unpackCallGasLimit() +
-        userOp.unpackPaymasterVerificationGasLimit() +
-        userOp.unpackPostOpGasLimit());
     uint256 balance = UserBalances.get(userAccount);
-    if (cost > balance) {
+    if (maxCost > balance) {
       revert("Insufficient user balance");
     }
 
     // Deduct cost from the user's balance
-    UserBalances.set(userAccount, balance - cost);
+    UserBalances.set(userAccount, balance - maxCost);
 
-    // Pass the deducted balance in the context
-    context = abi.encode(uint256(1));
+    // Pass the user account and deducted balance in the context
+    context = abi.encode(userAccount, maxCost);
     validationData = _packValidationData(false, 0, 0);
   }
 
@@ -94,9 +93,13 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     uint256 actualGasCost,
     uint256 actualUserOpFeePerGas
   ) internal virtual {
-    (mode, context, actualGasCost, actualUserOpFeePerGas); // unused params
-    revert("not implemented");
-    // Refund decutedBalance - (actualGasCost * actualUserOpFeePerGas + overhead for postOp) to the user account balance
+    (mode); // unused parameter
+    (address user, uint256 maxCost) = abi.decode(context, (address, uint256));
+
+    uint256 refund = maxCost - actualUserOpFeePerGas * (actualGasCost + POST_OP_OVERHEAD);
+
+    // Refund unused cost to user
+    UserBalances.set(user, UserBalances.get(user) + refund);
   }
 
   function getAllowance(address spender) public view returns (uint256) {

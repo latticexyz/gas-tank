@@ -104,6 +104,29 @@ contract PaymasterTest is MudTest {
     // TODO: test the counter is increased and sender is correct
   }
 
+  function testRefund() external {
+    vm.deal(address(this), 1 ether);
+    paymaster.depositTo{value: 1 ether}(user);
+
+    assertEq(paymaster.getBalance(user), 1 ether);
+
+    vm.prank(user);
+    paymaster.registerSpender(address(account));
+
+    PackedUserOperation memory op = fillUserOp(
+      account,
+      userKey,
+      address(counter),
+      0,
+      abi.encodeWithSelector(TestCounter.count.selector)
+    );
+    op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
+    op.signature = signUserOp(op, userKey);
+    uint256 gasUsed = submitUserOp(op);
+
+    assertEq(paymaster.getBalance(user), 1 ether - gasUsed);
+  }
+
   function fillUserOp(
     SimpleAccount _sender,
     uint256 _key,
@@ -127,9 +150,11 @@ contract PaymasterTest is MudTest {
     signature = abi.encodePacked(r, s, v);
   }
 
-  function submitUserOp(PackedUserOperation memory op) public {
+  function submitUserOp(PackedUserOperation memory op) public returns (uint256 gasUsed) {
     PackedUserOperation[] memory ops = new PackedUserOperation[](1);
     ops[0] = op;
+    gasUsed = gasleft();
     entryPoint.handleOps(ops, beneficiary);
+    gasUsed -= gasleft();
   }
 }
