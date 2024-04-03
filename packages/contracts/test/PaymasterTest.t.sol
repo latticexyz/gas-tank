@@ -80,7 +80,7 @@ contract PaymasterTest is MudTest {
     ops[0] = op;
     entryPoint.handleOps(ops, beneficiary);
 
-    // TODO: test the counter is increased and sender is correct
+    assertEq(counter.counters(address(account)), 1);
   }
 
   function testPaymaster() external {
@@ -101,10 +101,10 @@ contract PaymasterTest is MudTest {
     op.signature = signUserOp(op, userKey);
     submitUserOp(op);
 
-    // TODO: test the counter is increased and sender is correct
+    assertEq(counter.counters(address(account)), 1);
   }
 
-  function testRefund() external {
+  function testCounterRefund() external {
     uint256 startBalance = 1 ether;
     vm.deal(address(this), startBalance);
     paymaster.depositTo{ value: startBalance }(user);
