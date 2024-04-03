@@ -23,7 +23,6 @@ import { BytesLib } from "./utils/BytesLib.sol";
 using ECDSA for bytes32;
 
 contract PaymasterTest is MudTest {
-
   EntryPoint entryPoint;
   EntryPointSimulations entryPointSimulations;
   SimpleAccountFactory accountFactory;
@@ -127,7 +126,7 @@ contract PaymasterTest is MudTest {
     uint256 gasUsed = submitUserOp(op);
     uint256 realFeePerGas = getUserOpGasPrice(op);
     uint256 realCost = gasUsed * realFeePerGas;
-    
+
     uint256 estimatedCost = startBalance - paymaster.getBalance(user);
     uint256 diffCost = realCost - estimatedCost;
     uint256 diffGas = diffCost / realFeePerGas;
@@ -179,8 +178,4 @@ contract PaymasterTest is MudTest {
     }
     return min(maxFeePerGas, maxPriorityFeePerGas + block.basefee);
   }
-}
-
-function max(uint256 a, uint256 b) pure returns (uint256) {
-    return a > b ? a : b;
 }
