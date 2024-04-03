@@ -115,6 +115,19 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     _depositToEntryPoint(_msgValue());
   }
 
+  /**
+   * Withdraw from the deposit.
+   * @param withdrawAddress - The address to send withdrawn value.
+   * @param withdrawAmount  - The amount to withdraw.
+   */
+  function withdrawTo(address payable withdrawAddress, uint256 withdrawAmount) public {
+    address user = _msgSender();
+    uint256 balance = UserBalances.get(user);
+    require(balance >= withdrawAmount, "Insufficient balance");
+    UserBalances.set(user, balance - withdrawAmount);
+    IEntryPoint(EntryPoint.get()).withdrawTo(withdrawAddress, withdrawAmount);
+  }
+
   function registerSpender(address spender) public {
     require(Spender.getUserAccount(spender) == address(0), "Spender already registered");
     Spender.setUserAccount(spender, _msgSender());

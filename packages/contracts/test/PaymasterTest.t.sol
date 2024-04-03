@@ -55,14 +55,49 @@ contract PaymasterTest is MudTest {
     EntryPointTable.set(address(entryPoint));
   }
 
-  function testDepositTo() external {
-    vm.deal(address(this), 1 ether);
-    paymaster.depositTo{ value: 1 ether }(user);
-    assertEq(paymaster.getBalance(user), 1 ether);
+  function testDepositTo(uint256 amount) external {
+    vm.deal(address(this), amount);
+    paymaster.depositTo{ value: amount }(user);
+    assertEq(paymaster.getBalance(user), amount);
 
     vm.prank(user);
     paymaster.registerSpender(address(account));
-    assertEq(paymaster.getAllowance(address(account)), 1 ether);
+    assertEq(paymaster.getAllowance(address(account)), amount);
+
+    assertEq(entryPoint.balanceOf(address(paymaster)), amount);
+  }
+
+  function testWithdrawTo(uint256 depositAmount, uint256 withdrawAmount) external {
+    vm.assume(depositAmount >= withdrawAmount);
+    
+    address payable withdrawAddress = payable(makeAddr("withdrawAddress"));
+    vm.deal(address(this), depositAmount);
+    paymaster.depositTo{ value: depositAmount}(user);
+    assertEq(paymaster.getBalance(user), depositAmount);
+    assertEq(user.balance, 0);
+    assertEq(entryPoint.balanceOf(address(paymaster)), depositAmount);
+
+    vm.prank(user);
+    paymaster.registerSpender(address(account));
+    assertEq(paymaster.getAllowance(address(account)), depositAmount);
+
+    vm.prank(user);
+    paymaster.withdrawTo(withdrawAddress, withdrawAmount);
+
+    assertEq(user.balance, 0);
+    assertEq(withdrawAddress.balance, withdrawAmount);
+    assertEq(paymaster.getAllowance(address(account)), depositAmount - withdrawAmount);
+    assertEq(paymaster.getBalance(address(user)), depositAmount - withdrawAmount);
+    assertEq(entryPoint.balanceOf(address(paymaster)), depositAmount - withdrawAmount);
+  }
+
+  function testWithdrawFail() external {
+    vm.deal(address(this), 1 ether);
+    paymaster.depositTo{ value: 1 ether}(user);
+
+    vm.prank(user);
+    vm.expectRevert("Insufficient balance");
+    paymaster.withdrawTo(payable(user), 1 ether + 1);
   }
 
   // sanity check for everything works without paymaster
