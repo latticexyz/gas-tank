@@ -15,7 +15,7 @@ import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
 import { IAllowance } from "./IAllowance.sol";
 
-uint256 constant POST_OP_OVERHEAD = 0;
+uint256 constant POST_OP_OVERHEAD = 30420;
 
 contract PaymasterSystem is System, IPaymaster, IAllowance {
   using UserOperationLib for PackedUserOperation;
@@ -96,7 +96,7 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     (mode); // unused parameter
     (address user, uint256 maxCost) = abi.decode(context, (address, uint256));
 
-    uint256 refund = maxCost - actualUserOpFeePerGas * (actualGasCost + POST_OP_OVERHEAD);
+    uint256 refund = maxCost - (actualGasCost + POST_OP_OVERHEAD * actualUserOpFeePerGas);
 
     // Refund unused cost to user
     UserBalances.set(user, UserBalances.get(user) + refund);

@@ -17,12 +17,13 @@ import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { EntryPoint as EntryPointTable } from "../src/codegen/tables/EntryPoint.sol";
 
-import { TestCounter} from "./utils/TestCounter.sol";
+import { TestCounter } from "./utils/TestCounter.sol";
 import { BytesLib } from "./utils/BytesLib.sol";
 
 using ECDSA for bytes32;
 
 contract PaymasterTest is MudTest {
+
   EntryPoint entryPoint;
   EntryPointSimulations entryPointSimulations;
   SimpleAccountFactory accountFactory;
@@ -85,7 +86,7 @@ contract PaymasterTest is MudTest {
 
   function testPaymaster() external {
     vm.deal(address(this), 1 ether);
-    paymaster.depositTo{value: 1 ether}(user);
+    paymaster.depositTo{ value: 1 ether }(user);
 
     vm.prank(user);
     paymaster.registerSpender(address(account));
@@ -105,10 +106,11 @@ contract PaymasterTest is MudTest {
   }
 
   function testRefund() external {
-    vm.deal(address(this), 1 ether);
-    paymaster.depositTo{value: 1 ether}(user);
+    uint256 startBalance = 1 ether;
+    vm.deal(address(this), startBalance);
+    paymaster.depositTo{ value: startBalance }(user);
 
-    assertEq(paymaster.getBalance(user), 1 ether);
+    assertEq(paymaster.getBalance(user), startBalance);
 
     vm.prank(user);
     paymaster.registerSpender(address(account));
@@ -123,8 +125,18 @@ contract PaymasterTest is MudTest {
     op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
     op.signature = signUserOp(op, userKey);
     uint256 gasUsed = submitUserOp(op);
+    uint256 realFeePerGas = getUserOpGasPrice(op);
+    uint256 realCost = gasUsed * realFeePerGas;
+    
+    uint256 estimatedCost = startBalance - paymaster.getBalance(user);
+    uint256 diffCost = realCost - estimatedCost;
+    uint256 diffGas = diffCost / realFeePerGas;
 
-    assertEq(paymaster.getBalance(user), 1 ether - gasUsed);
+    assertEq(estimatedCost, realCost);
+    console.log("real cost", realCost);
+    console.log("estimated cost", estimatedCost);
+    console.log("diff cost", diffCost);
+    console.log("diff gas", diffGas);
   }
 
   function fillUserOp(
@@ -157,4 +169,18 @@ contract PaymasterTest is MudTest {
     entryPoint.handleOps(ops, beneficiary);
     gasUsed -= gasleft();
   }
+
+  function getUserOpGasPrice(PackedUserOperation memory op) internal view returns (uint256) {
+    uint256 maxFeePerGas = uint256(uint128(uint256(op.gasFees)));
+    uint256 maxPriorityFeePerGas = uint128(bytes16(op.gasFees));
+    if (maxFeePerGas == maxPriorityFeePerGas) {
+      // legacy mode (for networks that don't support basefee opcode)
+      return maxFeePerGas;
+    }
+    return min(maxFeePerGas, maxPriorityFeePerGas + block.basefee);
+  }
+}
+
+function max(uint256 a, uint256 b) pure returns (uint256) {
+    return a > b ? a : b;
 }
