@@ -31,6 +31,8 @@ interface IPaymasterSystem {
 
   function depositTo(address account) external payable;
 
+  function withdrawTo(address payable withdrawAddress, uint256 withdrawAmount) external;
+
   function registerSpender(address spender) external;
 
   function unregisterSpender(address spender) external;
