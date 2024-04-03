@@ -23,4 +23,5 @@ export default defineWorld({
       key: ["spender"],
     },
   },
+  modules: [{ name: "Unstable_CallWithSignatureModule", root: true }],
 });
