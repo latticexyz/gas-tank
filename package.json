@@ -1,6 +1,16 @@
 {
-  "name": "mud-template-vanilla",
+  "name": "@latticexyz/gas-tank",
   "private": true,
+  "exports": {
+    "./mud.config": "./packages/contracts/dist/mud.config.js"
+  },
+  "typesVersions": {
+    "*": {
+      "mud.config": [
+        "./packages/contracts/mud.config.ts"
+      ]
+    }
+  },
   "scripts": {
     "build": "pnpm recursive run build",
     "dev": "mprocs",
