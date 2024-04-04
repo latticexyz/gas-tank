@@ -9,6 +9,7 @@ import { UserOperationLib } from "@account-abstraction/contracts/core/UserOperat
 import { SimpleAccount } from "@account-abstraction/contracts/samples/SimpleAccount.sol";
 
 import { System } from "@latticexyz/world/src/System.sol";
+import { revertWithBytes } from "@latticexyz/world/src/revertWithBytes.sol";
 import { Balances as WorldBalances } from "@latticexyz/world/src/codegen/index.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
@@ -81,7 +82,7 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
   /**
    * Recover the signer from a `callWithSignature` to this paymaster
    */
-  function _recoverCallWithSignature(PackedUserOperation calldata userOp) internal view returns (address userAccount) {
+  function _recoverCallWithSignature(PackedUserOperation calldata userOp) internal returns (address userAccount) {
     // Require this to be a call to the smart account's `execute` function
     if (!userOp.isExecuteCall()) {
       return address(0);
@@ -100,18 +101,16 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
       return address(0);
     }
 
-    // Verify the signature
-    (address signer, ResourceId systemId, bytes memory callData, bytes memory signature) = abi.decode(
-      getArguments(executeCallData),
-      (address, ResourceId, bytes, bytes)
+    // Validate the signature
+    bytes calldata callWithSignatureData = getArguments(executeCallData);
+    (bool success, bytes memory returnData) = (_world()).delegatecall(
+      abi.encodePacked(Unstable_CallWithSignatureSystem.validateCallWithSignature.selector, callWithSignatureData)
     );
-    uint256 nonce = CallWithSignatureNonces.get(signer);
-    bytes32 hash = getSignedMessageHash(signer, systemId, callData, nonce, _world());
-    address recoveredSigner = ECDSA.recover(hash, signature);
-    if (signer != recoveredSigner) {
-      revert("Invalid callWithSignature");
+    if (!success) {
+      revertWithBytes(returnData);
     }
 
+    address signer = address(uint160(uint256(bytes32(callWithSignatureData[0:32]))));
     return signer;
   }
 
