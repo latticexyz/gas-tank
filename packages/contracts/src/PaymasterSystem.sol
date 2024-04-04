@@ -9,15 +9,12 @@ import { UserOperationLib } from "@account-abstraction/contracts/core/UserOperat
 import { SimpleAccount } from "@account-abstraction/contracts/samples/SimpleAccount.sol";
 
 import { System } from "@latticexyz/world/src/System.sol";
-import { revertWithBytes } from "@latticexyz/world/src/revertWithBytes.sol";
 import { Balances as WorldBalances } from "@latticexyz/world/src/codegen/index.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
 import { RESOURCE_SYSTEM } from "@latticexyz/world/src/worldResourceTypes.sol";
 import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/delegation/Unstable_CallWithSignatureModule.sol";
-import { CallWithSignatureNonces } from "@latticexyz/world-modules/src/modules/delegation/tables/CallWithSignatureNonces.sol";
-import { getSignedMessageHash } from "@latticexyz/world-modules/src/modules/delegation/getSignedMessageHash.sol";
-import { ECDSA } from "@latticexyz/world-modules/src/modules/delegation/ECDSA.sol";
+import { validateCallWithSignature } from "@latticexyz/world-modules/src/modules/delegation/validateCallWithSignature.sol";
 import { EntryPoint } from "./codegen/tables/EntryPoint.sol";
 import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
@@ -82,7 +79,7 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
   /**
    * Recover the signer from a `callWithSignature` to this paymaster
    */
-  function _recoverCallWithSignature(PackedUserOperation calldata userOp) internal returns (address userAccount) {
+  function _recoverCallWithSignature(PackedUserOperation calldata userOp) internal view returns (address userAccount) {
     // Require this to be a call to the smart account's `execute` function
     if (!userOp.isExecuteCall()) {
       return address(0);
@@ -102,15 +99,12 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     }
 
     // Validate the signature
-    bytes calldata callWithSignatureData = getArguments(executeCallData);
-    (bool success, bytes memory returnData) = (_world()).delegatecall(
-      abi.encodePacked(Unstable_CallWithSignatureSystem.validateCallWithSignature.selector, callWithSignatureData)
+    (address signer, ResourceId systemId, bytes memory callData, bytes memory signature) = abi.decode(
+      getArguments(executeCallData),
+      (address, ResourceId, bytes, bytes)
     );
-    if (!success) {
-      revertWithBytes(returnData);
-    }
+    validateCallWithSignature(signer, systemId, callData, signature);
 
-    address signer = address(uint160(uint256(bytes32(callWithSignatureData[0:32]))));
     return signer;
   }
 

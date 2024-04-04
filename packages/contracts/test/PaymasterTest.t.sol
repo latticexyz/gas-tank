@@ -214,7 +214,7 @@ contract PaymasterTest is MudTest {
       )
     );
     op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
-    op.accountGasLimits = bytes32(abi.encodePacked(bytes16(uint128(80000)), bytes16(uint128(100000))));
+    op.accountGasLimits = bytes32(abi.encodePacked(bytes16(uint128(80000)), bytes16(uint128(110000))));
     op.signature = signUserOp(op, userKey);
 
     // Submit the userOp    
