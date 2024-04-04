@@ -2,7 +2,9 @@
   "name": "@latticexyz/gas-tank",
   "private": true,
   "exports": {
-    "./mud.config": "./packages/contracts/dist/mud.config.js"
+    "./mud.config": "./packages/contracts/dist/mud.config.js",
+    "./out/*": "./packages/contracts/out/*",
+    "./internal/worlds.json": "./packages/contracts/worlds.json"
   },
   "typesVersions": {
     "*": {
