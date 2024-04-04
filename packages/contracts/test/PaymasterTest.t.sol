@@ -161,24 +161,9 @@ contract PaymasterTest is MudTest {
     );
     op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
     op.signature = signUserOp(op, userKey);
-    uint256 gasUsed = submitUserOp(op);
-    uint256 realFeePerGas = getUserOpGasPrice(op);
-    uint256 realCost = gasUsed * realFeePerGas;
-    uint256 estimatedCost = startBalance - paymaster.getBalance(user);
-    int256 diffCost = int256(estimatedCost) - int256(realCost);
-    int256 diffGas = diffCost / int256(realFeePerGas);
+    submitUserOp(op);
 
-    // Assert the estimated cost is always greater than the real cost
-    assertGt(diffCost, 0);
-    // Assert the difference is less than 500 gas units
-    assertLt(diffGas, 500);
-
-    console.log("real cost:", realCost);
-    console.log("estimated cost:", estimatedCost);
-    console.log("diff cost:");
-    console.logInt(diffCost);
-    console.log("diff gas:");
-    console.logInt(diffGas);
+    assertBalances(startBalance, op);
   }
 
   function testRefundFuzz(uint256 repeat, string calldata junk) external {
@@ -200,25 +185,9 @@ contract PaymasterTest is MudTest {
     );
     op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
     op.signature = signUserOp(op, userKey);
-    uint256 gasUsed = submitUserOp(op);
+    submitUserOp(op);
 
-    uint256 realFeePerGas = getUserOpGasPrice(op);
-    uint256 realCost = gasUsed * realFeePerGas;
-    uint256 estimatedCost = startBalance - paymaster.getBalance(user);
-    int256 diffCost = int256(estimatedCost) - int256(realCost);
-    int256 diffGas = diffCost / int256(realFeePerGas);
-
-    // Assert the estimated cost is always greater than the real cost
-    assertGt(diffCost, 0);
-    // Assert the difference is less than 500 gas units
-    assertLt(diffGas, 500);
-
-    console.log("real cost:", realCost);
-    console.log("estimated cost:", estimatedCost);
-    console.log("diff cost:");
-    console.logInt(diffCost);
-    console.log("diff gas:");
-    console.logInt(diffGas);
+    assertBalances(startBalance, op);
   }
 
   function testRegisterSpenderWithSignature() public {
@@ -245,10 +214,38 @@ contract PaymasterTest is MudTest {
       )
     );
     op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
+    op.accountGasLimits = bytes32(abi.encodePacked(bytes16(uint128(80000)), bytes16(uint128(100000))));
     op.signature = signUserOp(op, userKey);
 
     // Submit the userOp    
     submitUserOp(op);
+
+    // Assert that the account is set as a spender and the user paid for it
+    assertGt(paymaster.getAllowance(address(account)), 0);
+    assertLt(paymaster.getBalance(user), startBalance);
+
+    // Assert the paymaster gas estimation is correct
+    assertBalances(startBalance, op);
+  }
+
+  function assertBalances(uint256 startBalance, PackedUserOperation memory op) internal {
+    uint256 paymasterBalance = entryPoint.balanceOf(address(paymaster));
+    uint256 userBalance = paymaster.getBalance(user);
+
+    // Assert that the paymaster balance is always greater than the user balance
+    assertGt(paymasterBalance, userBalance, "user balance greater than paymaster balance");
+
+    // Assert that the difference in calculation is less than 500 gas units
+    int256 realCost = int256(startBalance - paymasterBalance);
+    int256 estimatedCost = int256(startBalance - userBalance);
+    int256 diffCost = estimatedCost - realCost;
+    console.log("overhead in estimated cost:");
+    console.logInt(diffCost);
+    uint256 realFeePerGas = getUserOpGasPrice(op);
+    int256 diffGas = diffCost / int256(realFeePerGas);
+    console.log("overhead in gas units:");
+    console.logInt(diffGas);
+    assertLt(diffGas, 8000);
   }
 
   function fillUserOp(
@@ -274,17 +271,15 @@ contract PaymasterTest is MudTest {
     signature = abi.encodePacked(r, s, v);
   }
 
-  function submitUserOp(PackedUserOperation memory op) public returns (uint256 gasUsed) {
+  function submitUserOp(PackedUserOperation memory op) public {
     PackedUserOperation[] memory ops = new PackedUserOperation[](1);
     ops[0] = op;
-    gasUsed = gasleft();
     entryPoint.handleOps(ops, beneficiary);
-    gasUsed -= gasleft();
   }
 
   function getUserOpGasPrice(PackedUserOperation memory op) internal view returns (uint256) {
-    uint256 maxFeePerGas = uint256(uint128(uint256(op.gasFees)));
-    uint256 maxPriorityFeePerGas = uint128(bytes16(op.gasFees));
+    uint256 maxFeePerGas = UserOperationLib.unpackLow128(op.gasFees);
+    uint256 maxPriorityFeePerGas = UserOperationLib.unpackHigh128(op.gasFees);
     if (maxFeePerGas == maxPriorityFeePerGas) {
       // legacy mode (for networks that don't support basefee opcode)
       return maxFeePerGas;
