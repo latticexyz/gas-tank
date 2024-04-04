@@ -10,12 +10,17 @@ import { UserOperationLib } from "@account-abstraction/contracts/core/UserOperat
 import { System } from "@latticexyz/world/src/System.sol";
 import { Balances as WorldBalances } from "@latticexyz/world/src/codegen/index.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
+import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
+import { RESOURCE_SYSTEM } from "@latticexyz/world/src/worldResourceTypes.sol";
 import { EntryPoint } from "./codegen/tables/EntryPoint.sol";
 import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
 import { IAllowance } from "./IAllowance.sol";
 
 uint256 constant POST_OP_OVERHEAD = 30900;
+ResourceId constant PAYMASTER_SYSTEM_ID = ResourceId.wrap(
+  bytes32(abi.encodePacked(RESOURCE_SYSTEM, bytes14(""), bytes16("PaymasterSystem")))
+);
 
 contract PaymasterSystem is System, IPaymaster, IAllowance {
   using UserOperationLib for PackedUserOperation;
@@ -46,6 +51,8 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     // Require the sender to be a registered spender of a user account
     address userAccount = Spender.getUserAccount(userOp.getSender());
     if (userAccount == address(0)) {
+      // Check if this is a call to this contract's registerSpender
+      // Approve if the signature is valid
       revert("Account is not registered as spender for any user");
     }
 

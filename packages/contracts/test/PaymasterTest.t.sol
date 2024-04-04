@@ -14,8 +14,11 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { MudTest } from "@latticexyz/world/test/MudTest.t.sol";
 import { NamespaceOwner } from "@latticexyz/world/src/codegen/tables/NamespaceOwner.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
+import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/delegation/Unstable_CallWithSignatureModule.sol";
+import { getSignedMessageHash } from "@latticexyz/world-modules/src/modules/delegation/getSignedMessageHash.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { EntryPoint as EntryPointTable } from "../src/codegen/tables/EntryPoint.sol";
+import { PAYMASTER_SYSTEM_ID } from "../src/PaymasterSystem.sol";
 
 import { TestCounter } from "./utils/TestCounter.sol";
 import { BytesLib } from "./utils/BytesLib.sol";
@@ -69,10 +72,10 @@ contract PaymasterTest is MudTest {
 
   function testWithdrawTo(uint256 depositAmount, uint256 withdrawAmount) external {
     vm.assume(depositAmount >= withdrawAmount);
-    
+
     address payable withdrawAddress = payable(makeAddr("withdrawAddress"));
     vm.deal(address(this), depositAmount);
-    paymaster.depositTo{ value: depositAmount}(user);
+    paymaster.depositTo{ value: depositAmount }(user);
     assertEq(paymaster.getBalance(user), depositAmount);
     assertEq(user.balance, 0);
     assertEq(entryPoint.balanceOf(address(paymaster)), depositAmount);
@@ -93,7 +96,7 @@ contract PaymasterTest is MudTest {
 
   function testWithdrawFail() external {
     vm.deal(address(this), 1 ether);
-    paymaster.depositTo{ value: 1 ether}(user);
+    paymaster.depositTo{ value: 1 ether }(user);
 
     vm.prank(user);
     vm.expectRevert("Insufficient balance");
@@ -216,6 +219,36 @@ contract PaymasterTest is MudTest {
     console.logInt(diffCost);
     console.log("diff gas:");
     console.logInt(diffGas);
+  }
+
+  function testRegisterSpenderWithSignature() public {
+    // Fund the user's gas tank
+    uint256 startBalance = 1 ether;
+    vm.deal(address(this), startBalance);
+    paymaster.depositTo{ value: startBalance }(user);
+
+    // Sign a call to register the account as spender for the user
+    bytes memory callData = abi.encodeCall(paymaster.registerSpender, (address(account)));
+    bytes32 hash = getSignedMessageHash(user, PAYMASTER_SYSTEM_ID, callData, 0, address(paymaster));
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(userKey, hash);
+    bytes memory signature = abi.encodePacked(r, s, v);
+
+    // Prepare userOp for calling the paymaster via `callWithSignature`
+    PackedUserOperation memory op = fillUserOp(
+      account,
+      userKey,
+      address(paymaster),
+      0,
+      abi.encodeCall(
+        Unstable_CallWithSignatureSystem.callWithSignature,
+        (user, PAYMASTER_SYSTEM_ID, callData, signature)
+      )
+    );
+    op.paymasterAndData = abi.encodePacked(address(paymaster), uint128(100000), uint128(100000));
+    op.signature = signUserOp(op, userKey);
+
+    // Submit the userOp    
+    submitUserOp(op);
   }
 
   function fillUserOp(
