@@ -10,6 +10,12 @@
     "*": {
       "mud.config": [
         "./packages/contracts/mud.config.ts"
+      ],
+      "out/*": [
+        "./packages/contracts/out/*"
+      ],
+      "internal/worlds.json": [
+        "./packages/contracts/worlds.json"
       ]
     }
   },
