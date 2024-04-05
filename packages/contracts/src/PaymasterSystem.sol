@@ -14,9 +14,7 @@ import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
 import { RESOURCE_SYSTEM } from "@latticexyz/world/src/worldResourceTypes.sol";
 import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/delegation/Unstable_CallWithSignatureModule.sol";
-import { CallWithSignatureNonces } from "@latticexyz/world-modules/src/modules/delegation/tables/CallWithSignatureNonces.sol";
-import { getSignedMessageHash } from "@latticexyz/world-modules/src/modules/delegation/getSignedMessageHash.sol";
-import { ECDSA } from "@latticexyz/world-modules/src/modules/delegation/ECDSA.sol";
+import { validateCallWithSignature } from "@latticexyz/world-modules/src/modules/delegation/validateCallWithSignature.sol";
 import { EntryPoint } from "./codegen/tables/EntryPoint.sol";
 import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
@@ -100,17 +98,12 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
       return address(0);
     }
 
-    // Verify the signature
+    // Validate the signature
     (address signer, ResourceId systemId, bytes memory callData, bytes memory signature) = abi.decode(
       getArguments(executeCallData),
       (address, ResourceId, bytes, bytes)
     );
-    uint256 nonce = CallWithSignatureNonces.get(signer);
-    bytes32 hash = getSignedMessageHash(signer, systemId, callData, nonce, _world());
-    address recoveredSigner = ECDSA.recover(hash, signature);
-    if (signer != recoveredSigner) {
-      revert("Invalid callWithSignature");
-    }
+    validateCallWithSignature(signer, systemId, callData, signature);
 
     return signer;
   }
