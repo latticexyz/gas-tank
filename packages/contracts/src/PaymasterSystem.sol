@@ -6,19 +6,28 @@ import { PackedUserOperation } from "@account-abstraction/contracts/interfaces/P
 import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import { _packValidationData } from "@account-abstraction/contracts/core/Helpers.sol";
 import { UserOperationLib } from "@account-abstraction/contracts/core/UserOperationLib.sol";
+import { SimpleAccount } from "@account-abstraction/contracts/samples/SimpleAccount.sol";
 
 import { System } from "@latticexyz/world/src/System.sol";
 import { Balances as WorldBalances } from "@latticexyz/world/src/codegen/index.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
+import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
+import { RESOURCE_SYSTEM } from "@latticexyz/world/src/worldResourceTypes.sol";
+import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/delegation/Unstable_CallWithSignatureModule.sol";
+import { validateCallWithSignature } from "@latticexyz/world-modules/src/modules/delegation/validateCallWithSignature.sol";
 import { EntryPoint } from "./codegen/tables/EntryPoint.sol";
 import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
 import { IAllowance } from "./IAllowance.sol";
 
-uint256 constant POST_OP_OVERHEAD = 30900;
+uint256 constant POST_OP_OVERHEAD = 40000;
+ResourceId constant PAYMASTER_SYSTEM_ID = ResourceId.wrap(
+  bytes32(abi.encodePacked(RESOURCE_SYSTEM, bytes14(""), bytes16("PaymasterSystem")))
+);
 
 contract PaymasterSystem is System, IPaymaster, IAllowance {
   using UserOperationLib for PackedUserOperation;
+  using SimpleAccountUserOperationLib for PackedUserOperation;
 
   /// @inheritdoc IPaymaster
   function validatePaymasterUserOp(
@@ -46,7 +55,11 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     // Require the sender to be a registered spender of a user account
     address userAccount = Spender.getUserAccount(userOp.getSender());
     if (userAccount == address(0)) {
-      revert("Account is not registered as spender for any user");
+      // Allow calls to `callWithSignature` on this paymaster before a spender is registered
+      userAccount = _recoverCallWithSignature(userOp);
+      if (userAccount == address(0)) {
+        revert("Account is not registered as spender for any user");
+      }
     }
 
     // Require the user account to have sufficient balance
@@ -61,6 +74,38 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
     // Pass the user account and deducted balance in the context
     context = abi.encode(userAccount, maxCost);
     validationData = _packValidationData(false, 0, 0);
+  }
+
+  /**
+   * Recover the signer from a `callWithSignature` to this paymaster
+   */
+  function _recoverCallWithSignature(PackedUserOperation calldata userOp) internal view returns (address userAccount) {
+    // Require this to be a call to the smart account's `execute` function
+    if (!userOp.isExecuteCall()) {
+      return address(0);
+    }
+
+    // Require the target of this `execute` call to be this contract
+    if (userOp.getExecuteDestination() != _world()) {
+      return address(0);
+    }
+
+    // Extract the function payload from the `execute` call
+    bytes calldata executeCallData = userOp.getExecuteCallData();
+
+    // Require the target of this `execute` call to be `callWithSignature`
+    if (getFunctionSelector(executeCallData) != Unstable_CallWithSignatureSystem.callWithSignature.selector) {
+      return address(0);
+    }
+
+    // Validate the signature
+    (address signer, ResourceId systemId, bytes memory callData, bytes memory signature) = abi.decode(
+      getArguments(executeCallData),
+      (address, ResourceId, bytes, bytes)
+    );
+    validateCallWithSignature(signer, systemId, callData, signature);
+
+    return signer;
   }
 
   /// @inheritdoc IPaymaster
@@ -148,5 +193,29 @@ contract PaymasterSystem is System, IPaymaster, IAllowance {
   function _depositToEntryPoint(uint256 amount) internal {
     WorldBalances.set(ROOT_NAMESPACE_ID, WorldBalances.get(ROOT_NAMESPACE_ID) - amount);
     IEntryPoint(EntryPoint.get()).depositTo{ value: amount }(address(this));
+  }
+}
+
+function getFunctionSelector(bytes calldata callData) pure returns (bytes4) {
+  return bytes4(callData[0:4]);
+}
+
+function getArguments(bytes calldata callData) pure returns (bytes calldata) {
+  return callData[4:];
+}
+
+// Extract arguments from SimpleAccount.execute call
+library SimpleAccountUserOperationLib {
+  function isExecuteCall(PackedUserOperation calldata op) internal pure returns (bool) {
+    return getFunctionSelector(op.callData) == SimpleAccount.execute.selector;
+  }
+
+  function getExecuteDestination(PackedUserOperation calldata op) internal pure returns (address) {
+    return address(uint160(uint256(bytes32(getArguments(op.callData)[0:32]))));
+  }
+
+  function getExecuteCallData(PackedUserOperation calldata op) internal pure returns (bytes calldata) {
+    // destination (32B) | value (32B) | first encoding length (32B) | second encoding length (32B) | call data bytes
+    return getArguments(op.callData)[128:];
   }
 }
