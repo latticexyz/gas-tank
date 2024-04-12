@@ -14,8 +14,8 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { MudTest } from "@latticexyz/world/test/MudTest.t.sol";
 import { NamespaceOwner } from "@latticexyz/world/src/codegen/tables/NamespaceOwner.sol";
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
-import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/delegation/Unstable_CallWithSignatureModule.sol";
-import { getSignedMessageHash } from "@latticexyz/world-modules/src/modules/delegation/getSignedMessageHash.sol";
+import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/callwithsignature/Unstable_CallWithSignatureModule.sol";
+import { getSignedMessageHash } from "@latticexyz/world-modules/src/modules/callwithsignature/getSignedMessageHash.sol";
 import { IWorld } from "../src/codegen/world/IWorld.sol";
 import { EntryPoint as EntryPointTable } from "../src/codegen/tables/EntryPoint.sol";
 import { PAYMASTER_SYSTEM_ID } from "../src/PaymasterSystem.sol";
@@ -217,7 +217,7 @@ contract PaymasterTest is MudTest {
     op.accountGasLimits = bytes32(abi.encodePacked(bytes16(uint128(80000)), bytes16(uint128(110000))));
     op.signature = signUserOp(op, userKey);
 
-    // Submit the userOp    
+    // Submit the userOp
     submitUserOp(op);
 
     // Assert that the account is set as a spender and the user paid for it

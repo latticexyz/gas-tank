@@ -13,8 +13,8 @@ import { Balances as WorldBalances } from "@latticexyz/world/src/codegen/index.s
 import { ROOT_NAMESPACE_ID } from "@latticexyz/world/src/constants.sol";
 import { ResourceId } from "@latticexyz/store/src/ResourceId.sol";
 import { RESOURCE_SYSTEM } from "@latticexyz/world/src/worldResourceTypes.sol";
-import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/delegation/Unstable_CallWithSignatureModule.sol";
-import { validateCallWithSignature } from "@latticexyz/world-modules/src/modules/delegation/validateCallWithSignature.sol";
+import { Unstable_CallWithSignatureSystem } from "@latticexyz/world-modules/src/modules/callwithsignature/Unstable_CallWithSignatureModule.sol";
+import { validateCallWithSignature } from "@latticexyz/world-modules/src/modules/callwithsignature/validateCallWithSignature.sol";
 import { EntryPoint } from "./codegen/tables/EntryPoint.sol";
 import { UserBalances } from "./codegen/tables/UserBalances.sol";
 import { Spender } from "./codegen/tables/Spender.sol";
